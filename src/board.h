@@ -29,7 +29,7 @@ enum {
 };
 
 enum {
-    WHITE, BLACK
+    WHITE, BLACK, BOTH
 };
 
 // RANKS CONST
@@ -62,12 +62,21 @@ enum {
 #define ODD_FILES 12297829382473034410ULL
 #define EVEN_FILES 6148914691236517205ULL
 
+// CASTLING BITMASK 
+#define WHITE_KINGSIDE  1  // 0001
+#define WHITE_QUEENSIDE 2  // 0010
+#define BLACK_KINGSIDE  4  // 0100
+#define BLACK_QUEENSIDE 8  // 1000
+
+
 typedef struct {
     U64 pieces[12]; // P, N, B, R, Q, K 0-5 white, 6-11 black
     U64 occupancies[3]; // WHITE, BLACK, BOTH
     int side; // WHITE or BLACK
-    int enpassant;
-    int castling;
+    int enpassant; // -1 if not available
+    int castling; // bitmask
+    int halfmove;
+    int fullmove;
 } Board;
 
 
@@ -77,5 +86,7 @@ typedef struct {
 #define pop_bit(bitboard, square) ((bitboard) &= ~(1ULL << (square)))
 
 void print_bitboard(U64 bitboard);
+
+void fen_parser(Board *board, const char *fen);
 
 #endif
