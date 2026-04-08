@@ -48,6 +48,9 @@ void print_bitboard(U64 bitboard){
 
 Example: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 ---------------------------------------------------------- */
+int square_from_coords(char file, char rank){
+    return (8 - (rank - '0')) * 8 + (file - 'a');
+}
 
 void fen_parser(Board *board, const char *fen){
     // TODO: error handling
@@ -136,38 +139,48 @@ void fen_parser(Board *board, const char *fen){
     c = fen[i++];
     board->side = (c == 'w') ? WHITE : BLACK;
     // Castling
+    if((c = fen[i++]) == '-'){
+        board-> castling = 0;
+    } else {
     while((c = fen[i++]) != ' '){
-        if(c == '-') board-> castling = -1;
-        switch(c){
-            case 'K':
-                board->castling |= WHITE_KINGSIDE;
-                break;
-            case 'Q':
-                board->castling |= WHITE_QUEENSIDE;
-                break;
-            case 'k':
-                board->castling |= BLACK_KINGSIDE;
-                break;
-            case 'q':
-                board->castling |= BLACK_QUEENSIDE;
-                break;
-            default: // Error handling
-                return;
-                break;
+            switch(c){
+                case 'K':
+                    board->castling |= WHITE_KINGSIDE;
+                    break;
+                case 'Q':
+                    board->castling |= WHITE_QUEENSIDE;
+                    break;
+                case 'k':
+                    board->castling |= BLACK_KINGSIDE;
+                    break;
+                case 'q':
+                    board->castling |= BLACK_QUEENSIDE;
+                    break;
+                default: // Error handling
+                    return;
+                    break;
+            }
         }
     }
-    // En Passant
-    while((c = fen[i++]) != ' '){
-        if(c == '-') board-> enpassant = -1;
 
+    // En Passant
+    if(fen[i] == '-') {
+        board->enpassant = -1;
+        i++;
+    } else {
+        board->enpassant = square_from_coords(fen[i], fen[i+1]);
+        i += 2;
     }
-    // Halfmove Clock
+
+    //Halfmove Clock
     int acc = 0;
     while(fen[i] != ' ' && fen[i] != '\0'){
         acc = acc * 10 + (fen[i] - '0');
         i++;
     }
     board->halfmove = acc;
+    i++;
+
     // Fullmove Number
     acc = 0;
     while(fen[i] != ' ' && fen[i] != '\0'){
