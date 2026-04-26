@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include "src/board.h"
+#include "src/movegen.h"
 
 /*
 void main_loop(){
@@ -31,14 +32,29 @@ int main(){
     // LOOP
     // main_loop();
 
-    init_square_masks(rank_masks, file_masks);
+    init_board_masks();
+    init_attack_tables();
     
-    U64 bitboard = 0ULL;
 
-    char* fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; 
+    //char* fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; 
 
-    //print_bitboard(bitboard); 
+    U64 bitboard = knight_table[e4];
+    print_bitboard(bitboard); 
 
+    bitboard = king_table[a1];
+    print_bitboard(bitboard);
+
+    bitboard = queen_table[h1];
+    print_bitboard(bitboard);
+    
+    bitboard = pawn_table[WHITE][e4];
+    print_bitboard(bitboard);
+
+    bitboard = pawn_table[BLACK][d4];
+    print_bitboard(bitboard);
+    
+    bitboard = rook_table[e5];
+    print_bitboard(bitboard);
     /*
     for(int i = 0; i < 8; i++){
         for(int j = 0; j < 8; j++){
@@ -47,7 +63,7 @@ int main(){
         printf("\n");
     }
     */
-
+    /*
     Board *board = malloc(sizeof(Board)); 
 
     fen_parser(board, fen);
@@ -55,7 +71,7 @@ int main(){
     print_board(board);
 
     free(board);
-
+    */
     return 0;
 }
 

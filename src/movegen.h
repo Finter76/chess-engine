@@ -11,7 +11,14 @@ extern U64 bishop_table[64];
 extern U64 queen_table[64];
 extern U64 pawn_table[2][64];
 
+typedef struct {
+    Move moves[218];
+    int count;
+} MoveList;
+
+void init_moves();
 void init_attack_tables();
-void generate_moves();
+
+void generate_moves(Board *board, MoveList *list);
 
 #endif

@@ -140,6 +140,8 @@ typedef struct {
 #define get_bit(bitboard, square) ((bitboard) & (1ULL << (square)))
 #define set_bit(bitboard, square) ((bitboard) |= (1ULL << (square)))
 #define pop_bit(bitboard, square) ((bitboard) &= ~(1ULL << (square)))
+#define pop_LS1(bitboard) (__builtin_ctzll((bitboard)))
+#define bswap64(bitboard) (__builtin_bswap64((bitboard)))
 
 void print_bitboard(U64 bitboard);
 void print_board(Board *board);

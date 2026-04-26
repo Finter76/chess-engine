@@ -1,6 +1,11 @@
 #include "board.h"
 #include <string.h>
 
+U64 rank_masks[8];
+U64 file_masks[8];
+U64 diagonal_masks[64];
+U64 antidiagonal_masks[64];
+
 // INIT RANK & FILE MASKS ARRAY
 void init_board_masks(){
     rank_masks[0] = RANK_1;
@@ -206,9 +211,10 @@ void fen_parser(Board *board, const char *fen){
     // Side to Move
     c = fen[i++];
     board->side = (c == 'w') ? WHITE : BLACK;
+    i++;
     // Castling
     if((c = fen[i++]) == '-'){
-        board-> castling = 0;
+        board-> castling = 0; 
         i++;
     } else {
         while((c = fen[i++]) != ' '){
@@ -231,7 +237,6 @@ void fen_parser(Board *board, const char *fen){
             }
         }
     }
-
     // En Passant
     if(fen[i] == '-') {
         board->enpassant = NO_SQUARE;
