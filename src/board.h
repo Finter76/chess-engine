@@ -43,13 +43,17 @@ enum {
 
 // Quiet, capture, en passant, castling, promotion
 typedef enum {
-    QUIET, CAPTURE, ENPASSANT, CASTLING, PROMOTION
+    QUIET, CAPTURE, ENPASSANT, CASTLING, PROMOTION, PROMO_CAPTURE
 } Flag;
 
 typedef enum {
     P, N, B, R, Q, K, 
     p, n, b, r, q, k
 } Piece;
+
+typedef enum {
+    PROMO_N, PROMO_B, PROMO_R, PROMO_Q
+} Promotion;
 
 extern U64 rank_masks[8];
 extern U64 file_masks[8];
@@ -126,7 +130,7 @@ void init_board_masks(void);
 typedef struct {
     U64 pieces[12]; // P, N, B, R, Q, K 0-5 white, 6-11 black
     U64 occupancies[3]; // WHITE, BLACK, BOTH
-    int piece_on[64];
+    int piece_on[64]; // lookup table
     int side; // WHITE or BLACK
     int enpassant; // -1 if not available
     int castling; // bitmask

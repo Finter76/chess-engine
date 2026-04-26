@@ -148,7 +148,7 @@ void generate_sliding_moves(Board *board, MoveList *list, int side, int piece_ty
             int target = pop_LS1(attacks);
 
             // Move Encoding
-            Flag flag = get_bit(board->occupancies[!side], target) ? CAPTURE : QUIET;
+            Flag flag = get_bit(board->occupancies[!side], target) ? CAPTURE : ;
             Move move = encode_move(flag, 0, square, target);
             list->moves[list->count++] = move; 
 
@@ -178,29 +178,100 @@ void generate_static_moves(Board *board, MoveList *list, int side, int piece_typ
 
 void generate_pawn_moves(Board *board, Movelist *list, int side, U64 *attack_table){
     // Single Push
-    U64 bitboard = board->pieces[side];
-    while(bitboard){
-        int square = pop_LS1(bitboard);
-        U64 attacks = north(bitboard);
-        attacks &= ~board->occupancies[side]; // removes friend pieces
-        while(attacks){
-            int target = pop_LS1(attacks);
-            // Move Encoding
-            Flag flag = get_bit(board->occupancies[!side], target) ? CAPTURE : QUIET;
-            Move move = encode_move(flag, 0, square, target);
-            list->moves[list->count++] = move;
-            pop_bit(attacks, target);
-        }
-        pop_bit(bitboard, square);
-    
-        }
-    }
+    U64 single_push = side ? north(board->pieces[P + side * 6]) : south(board->pieces[P + side * 6]);
+    U64 double_push = side ? north(single_push & start_rank) : south(single_push & start_rank); 
 
+    single_push &= ~(board->occupancies[BOTH]);
+
+    while(single_push){
+        int square = pop_LS1(single_push);
+        
+        int pos = side ? square + 8 : square - 8;
+
+        Flag flag = side ? get_bit(RANK_1, square) : get_bit(RANK_8, square);
+
+        Move move;
+        if(!flag){
+            move = encode_move(QUIET, 0, pos, square);
+            list->moves[list->count++] = move;
+        } else{
+            move = encode_move(PROMOTION, PROMO_N, pos, square);
+            list->moves[list->count++] = move;
+            move = encode_move(PROMOTION, PROMO_B, pos, square);
+            list->moves[list->count++] = move;
+            move = encode_move(PROMOTION, PROMO_R, pos, square);
+            list->moves[list->count++] = move;
+            move = encode_move(PROMOTION, PROMO_Q, pos, square);
+            list->moves[list->count++] = move;
+        }
+        pop_bit(single_push, square);
+    }
+    
     // Double Push
+    U64 start_rank = side ? RANK_6 : RANK_3;
+    double_push &= ~board->occupancies[BOTH];
+    
+    while(double_push){
+        int square = pop_LS1(double_push);
+
+        int pos = side ? square + 16 : square - 16;
+
+        Move move = encode_move(QUIET, 0, pos, square);
+        list->moves[list->count++] = move;
+    
+        pop_bit(double_push, square);
+    }
     
     // Capture
+    U64 bitboard = board->pieces[P + side * 6];
+    while(bitboard){
+        int square = pop_LS1(bitboard);
+        U64 capture = pawn_table[side][square] & board->occupancies[!side];
+        while(capture){
+            int pos = pop_LS1(capture);
 
+            // Move Encoding
+            U64 rank = side ? RANK_1 : RANK_8;
+            int is_promotion = get_bit(rank, pos);
+
+            Move move;
+            if(!is_promotion){
+                move = encode_move(CAPTURE, 0, square, pos);
+                list->moves[list->count++] = move;
+            } else{
+                move = encode_move(PROMO_CAPTURE, PROMO_N, square, pos);
+                list->moves[list->count++] = move;
+                move = encode_move(PROMO_CAPTURE, PROMO_B, square, pos);
+                list->moves[list->count++] = move;
+                move = encode_move(PROMO_CAPTURE, PROMO_R, square , pos);
+                list->moves[list->count++] = move;
+                move = encode_move(PROMO_CAPTURE, PROMO_Q, square, pos);
+                list->moves[list->count++] = move;
+            }
+            
+
+
+            pop_bit(capture, pos);
+        }
+        pop_bit(bitboard, square);
+    }
     // En Passant
+    if(board->enpassant != NO_SQUARE){
+        U64 bitboard = board->pieces[P + side * 6];
+        while(bitboard){
+            int square = pop_LS1(bitboard);
+            U64 enpassant = pawn_table[side][square] & (1ULL << board->enpassant);
+            if(get_bit(enpassant, board->enpassant)){
+                int pos = board->enpassant;
+
+                // Move Encoding
+                Move move = encode_move(ENPASSANT, 0, square, pos);
+                list->moves[list->count++] = move;
+
+            }
+            pop_bit(bitboard, square);
+        }
+    }
 
     // Promotion
 }
@@ -216,5 +287,62 @@ void generate_moves(Board *board, MoveList *list){
     generate_static_moves(board, list, side, K + side * 6, king_table);     
 
     generate_pawn_moves(board, list, side, P + side * 6, pawn_table[side]);
+}
 
+void make_move(Board *dst, Board *src, Move move){
+    int from = get_from(move);
+    int to = get_to(move);
+    Flag flag = get_flag(move);
+    int promotion = get_promotion(move);
+
+    int piece = src->piece_on[from];
+    int side = src->side;
+
+    if(flag == CAPTURE || flag == PROMO_CAPTURE || piece == P || piece == p)
+        dst->halfmove = 0;
+    else
+        dst->halfmove++;
+    
+    if(dst->side) dst->fullmove++;
+    dst->side = !side;
+    dst->enpassant = NO_SQUARE;
+
+    if(flag == QUIET){
+        dst->piece_on[from] = EMPTY;
+        dst->piece_on[to] = piece;
+        
+        pop_bit(dst->pieces[piece], from);
+        set_bit(dst->pieces[piece], to);
+       
+        pop_bit(dst->occupancy[side], from);
+        set_bit(dst->occupancy[side], to);
+    } else if(flag == CAPTURE){
+        int captured = src->piece_on[to];
+
+        dst->piece_on[from] = EMPTY;
+        dst->piece_on[to] = piece;
+        
+        pop_bit(dst->pieces[piece], from);
+        set_bit(dst->pieces[piece], to);
+
+        pop_bit(dst->pieces[captured], to);
+        pop_bit(dst->occupancies[!side], to);
+       
+        pop_bit(dst->occupancies[side], from);
+        set_bit(dst->occupancies[side], to);
+    } else if(flag == ENPASSANT){
+  
+    } else if(flag == CASTLING){
+      
+    } else if(flag == PROMOTION){
+
+    } else if(flag == PROMO_CAPTURE){
+
+    }
+    
+    dst->occupancy[BOTH] = dst->occupancy[WHITE] | dst->occupancy[BLACK];
+}
+
+void unmake_move(Board *dst, Board *src){
+    memcpy(dst, src, sizeof(Board));
 }

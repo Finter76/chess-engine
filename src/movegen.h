@@ -21,4 +21,7 @@ void init_attack_tables();
 
 void generate_moves(Board *board, MoveList *list);
 
+void   make_move(Board *dst, Board *src, Move move);
+void unmake_move(Board *dst, Board *src);
+
 #endif
