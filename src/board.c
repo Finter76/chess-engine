@@ -6,6 +6,8 @@ U64 file_masks[8];
 U64 diagonal_masks[64];
 U64 antidiagonal_masks[64];
 
+int castling_rights[64];
+
 // INIT RANK & FILE MASKS ARRAY
 void init_board_masks(){
     rank_masks[0] = RANK_1;
@@ -42,6 +44,14 @@ void init_board_masks(){
                 set_bit(antidiagonal_masks[square], j);
         }
     }
+
+    for(int i = 0; i < 64; i++) castling_rights[i] = ~0;
+    castling_rights[a1] = ~WHITE_QUEENSIDE;
+    castling_rights[e1] = ~(WHITE_KINGSIDE | WHITE_QUEENSIDE);
+    castling_rights[h1] = ~WHITE_KINGSIDE;
+    castling_rights[a8] = ~BLACK_QUEENSIDE;
+    castling_rights[e8] = ~(BLACK_KINGSIDE | BLACK_QUEENSIDE);
+    castling_rights[h8] = ~BLACK_KINGSIDE;
 }
 
 void print_bitboard(U64 bitboard){

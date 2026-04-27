@@ -29,49 +29,16 @@ void main_loop(){
 */
 
 int main(){
-    // LOOP
-    // main_loop();
-
     init_board_masks();
     init_attack_tables();
     
-
-    //char* fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; 
-
-    U64 bitboard = knight_table[e4];
-    print_bitboard(bitboard); 
-
-    bitboard = king_table[a1];
-    print_bitboard(bitboard);
-
-    bitboard = queen_table[h1];
-    print_bitboard(bitboard);
+    Board board;
+    fen_parser(&board, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     
-    bitboard = pawn_table[WHITE][e4];
-    print_bitboard(bitboard);
-
-    bitboard = pawn_table[BLACK][d4];
-    print_bitboard(bitboard);
-    
-    bitboard = rook_table[e5];
-    print_bitboard(bitboard);
-    /*
-    for(int i = 0; i < 8; i++){
-        for(int j = 0; j < 8; j++){
-            printf("\"%c%d\", ", 'a'+j, i+1);
-        }
-        printf("\n");
+    for(int depth = 1; depth <= 5; depth++){
+        U64 nodes = perft(&board, depth);
+        printf("perft(%d) = %llu\n", depth, nodes);
     }
-    */
-    /*
-    Board *board = malloc(sizeof(Board)); 
-
-    fen_parser(board, fen);
-
-    print_board(board);
-
-    free(board);
-    */
+    
     return 0;
 }
-

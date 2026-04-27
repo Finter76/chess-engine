@@ -1,5 +1,7 @@
 #include "board.h"
 #include "movegen.h"
+#include <string.h>
+#include <assert.h>
 
 U64 king_table[64];
 U64 knight_table[64];
@@ -51,13 +53,13 @@ void generate_bishop_table(int square){
 U64 ray_attacks(U64 occupancy, int square, U64 mask){
     U64 attacks = 0ULL;
 
-    U64 r = 1ULL << square;
+    U64 r_bit = 1ULL << square;
     
     U64 o = occupancy & mask;
     U64 o2 = bswap64(o);
-    U64 r2 = bswap64(r);
+    U64 r2 = bswap64(r_bit);
     
-    attacks = ((o - 2*r) ^ bswap64(o2 - 2*r2)) & mask;
+    attacks = ((o - 2*r_bit) ^ bswap64(o2 - 2*r2)) & mask;
 
     return attacks;
 }
@@ -85,9 +87,6 @@ U64 rook_attacks(U64 occupancy, int square){
 U64 bishop_attacks(U64 occupancy, int square){
     U64 bishop_board = 0ULL;
     
-    int rank = square / 8;
-    int file = square % 8; 
-
     U64 ne = square < 63 ? diagonal_masks[square] & (~((1ULL << (square + 1)) - 1)) : 0ULL;
     U64 sw = square > 0 ? diagonal_masks[square] & ((1ULL << square) - 1) : 0ULL;
     U64 nw = square < 63 ? antidiagonal_masks[square] & (~((1ULL << (square + 1)) - 1)) : 0ULL;
@@ -125,16 +124,13 @@ void init_attack_tables(){
     for(int square = 0; square < 64; square++){  
         generate_knight_table(square);
         generate_king_table(square);
-        //generate_rook_table(square);
-        //generate_bishop_table(square);
-        //generate_queen_table(square);
         generate_pawn_table(square);
     }    
 }
 
-void init_movelist(MoveList *move){
+void init_movelist(MoveList *list){
     //memset(move, 0, sizeof(MoveList));
-    move->count = 0;
+    list->count = 0;
 }
 
 void generate_sliding_moves(Board *board, MoveList *list, int side, int piece_type, U64 (*attack_fn)(U64, int)){
@@ -148,7 +144,7 @@ void generate_sliding_moves(Board *board, MoveList *list, int side, int piece_ty
             int target = pop_LS1(attacks);
 
             // Move Encoding
-            Flag flag = get_bit(board->occupancies[!side], target) ? CAPTURE : ;
+            Flag flag = get_bit(board->occupancies[!side], target) ? CAPTURE : QUIET;
             Move move = encode_move(flag, 0, square, target);
             list->moves[list->count++] = move; 
 
@@ -166,27 +162,32 @@ void generate_static_moves(Board *board, MoveList *list, int side, int piece_typ
         attacks &= ~board->occupancies[side]; // removes friend pieces
         while(attacks){
             int target = pop_LS1(attacks);
+           
             // Move Encoding
             Flag flag = get_bit(board->occupancies[!side], target) ? CAPTURE : QUIET;
             Move move = encode_move(flag, 0, square, target);
             list->moves[list->count++] = move;
+            
             pop_bit(attacks, target);
         }
         pop_bit(bitboard, square);
     }
 }
 
-void generate_pawn_moves(Board *board, Movelist *list, int side, U64 *attack_table){
+void generate_pawn_moves(Board *board, MoveList *list, int side){
     // Single Push
-    U64 single_push = side ? north(board->pieces[P + side * 6]) : south(board->pieces[P + side * 6]);
-    U64 double_push = side ? north(single_push & start_rank) : south(single_push & start_rank); 
+    U64 single_push = side ? south(board->pieces[P + side * 6]) : north(board->pieces[P + side * 6]);
+    
+    U64 start_rank = side ? RANK_3 : RANK_6;
+    U64 double_push = side ? south(single_push & start_rank) : north(single_push & start_rank); 
+    double_push &= ~board->occupancies[BOTH];
 
     single_push &= ~(board->occupancies[BOTH]);
 
     while(single_push){
         int square = pop_LS1(single_push);
         
-        int pos = side ? square + 8 : square - 8;
+        int pos = side ? square - 8 : square + 8;
 
         Flag flag = side ? get_bit(RANK_1, square) : get_bit(RANK_8, square);
 
@@ -208,13 +209,11 @@ void generate_pawn_moves(Board *board, Movelist *list, int side, U64 *attack_tab
     }
     
     // Double Push
-    U64 start_rank = side ? RANK_6 : RANK_3;
-    double_push &= ~board->occupancies[BOTH];
     
     while(double_push){
         int square = pop_LS1(double_push);
 
-        int pos = side ? square + 16 : square - 16;
+        int pos = side ? square - 16 : square + 16;
 
         Move move = encode_move(QUIET, 0, pos, square);
         list->moves[list->count++] = move;
@@ -249,17 +248,15 @@ void generate_pawn_moves(Board *board, Movelist *list, int side, U64 *attack_tab
                 list->moves[list->count++] = move;
             }
             
-
-
             pop_bit(capture, pos);
         }
         pop_bit(bitboard, square);
     }
     // En Passant
     if(board->enpassant != NO_SQUARE){
-        U64 bitboard = board->pieces[P + side * 6];
-        while(bitboard){
-            int square = pop_LS1(bitboard);
+        U64 en_bitboard = board->pieces[P + side * 6];
+        while(en_bitboard){
+            int square = pop_LS1(en_bitboard);
             U64 enpassant = pawn_table[side][square] & (1ULL << board->enpassant);
             if(get_bit(enpassant, board->enpassant)){
                 int pos = board->enpassant;
@@ -269,11 +266,9 @@ void generate_pawn_moves(Board *board, Movelist *list, int side, U64 *attack_tab
                 list->moves[list->count++] = move;
 
             }
-            pop_bit(bitboard, square);
+            pop_bit(en_bitboard, square);
         }
     }
-
-    // Promotion
 }
 
 void generate_moves(Board *board, MoveList *list){
@@ -286,7 +281,7 @@ void generate_moves(Board *board, MoveList *list){
     generate_static_moves(board, list, side, N + side * 6, knight_table);     
     generate_static_moves(board, list, side, K + side * 6, king_table);     
 
-    generate_pawn_moves(board, list, side, P + side * 6, pawn_table[side]);
+    generate_pawn_moves(board, list, side);
 }
 
 void make_move(Board *dst, Board *src, Move move){
@@ -295,8 +290,10 @@ void make_move(Board *dst, Board *src, Move move){
     Flag flag = get_flag(move);
     int promotion = get_promotion(move);
 
-    int piece = src->piece_on[from];
     int side = src->side;
+    Piece promotion_piece = 1 + promotion + 6 * side;
+
+    int piece = src->piece_on[from];
 
     if(flag == CAPTURE || flag == PROMO_CAPTURE || piece == P || piece == p)
         dst->halfmove = 0;
@@ -314,8 +311,14 @@ void make_move(Board *dst, Board *src, Move move){
         pop_bit(dst->pieces[piece], from);
         set_bit(dst->pieces[piece], to);
        
-        pop_bit(dst->occupancy[side], from);
-        set_bit(dst->occupancy[side], to);
+        pop_bit(dst->occupancies[side], from);
+        set_bit(dst->occupancies[side], to);
+
+        if(piece == P || piece == p){
+            if(to - from == 16 || from - to == 16){
+                dst->enpassant = side ? from + 8 : from - 8; 
+            } 
+        }
     } else if(flag == CAPTURE){
         int captured = src->piece_on[to];
 
@@ -324,25 +327,128 @@ void make_move(Board *dst, Board *src, Move move){
         
         pop_bit(dst->pieces[piece], from);
         set_bit(dst->pieces[piece], to);
-
-        pop_bit(dst->pieces[captured], to);
-        pop_bit(dst->occupancies[!side], to);
        
         pop_bit(dst->occupancies[side], from);
         set_bit(dst->occupancies[side], to);
+
+        assert(captured != EMPTY);
+        pop_bit(dst->pieces[captured], to);
+        pop_bit(dst->occupancies[!side], to);
     } else if(flag == ENPASSANT){
-  
+        int captured_sq = side ? to + 8 : to - 8;
+        int captured = src->piece_on[captured_sq];
+
+        dst->piece_on[from] = EMPTY;
+        dst->piece_on[to] = piece;
+        dst->piece_on[captured_sq] = EMPTY;
+        
+        pop_bit(dst->pieces[piece], from);
+        set_bit(dst->pieces[piece], to);
+       
+        pop_bit(dst->occupancies[side], from);
+        set_bit(dst->occupancies[side], to);
+        
+        assert(captured != EMPTY);
+        pop_bit(dst->pieces[captured], captured_sq);
+        pop_bit(dst->occupancies[!side], captured_sq); 
     } else if(flag == CASTLING){
-      
+        dst->piece_on[from] = EMPTY;
+        dst->piece_on[to] = piece;
+
+        pop_bit(dst->pieces[piece], from);
+        set_bit(dst->pieces[piece], to);
+
+        pop_bit(dst->occupancies[side], from);
+        set_bit(dst->occupancies[side], to);
+
+        if(to == g1){
+            dst->piece_on[h1] = EMPTY;
+            dst->piece_on[f1] = R;
+
+            pop_bit(dst->pieces[R], h1);
+            set_bit(dst->pieces[R], f1);
+
+            pop_bit(dst->occupancies[WHITE], h1);
+            set_bit(dst->occupancies[WHITE], f1);
+        
+            dst->castling &= ~WHITE_KINGSIDE;
+        } else if(to == c1){  
+            dst->piece_on[a1] = EMPTY;
+            dst->piece_on[d1] = R;
+
+            pop_bit(dst->pieces[R], a1);
+            set_bit(dst->pieces[R], d1);
+
+            pop_bit(dst->occupancies[WHITE], a1);
+            set_bit(dst->occupancies[WHITE], d1);
+
+            dst->castling &= ~WHITE_QUEENSIDE;
+        } else if(to == g8){
+            dst->piece_on[h8] = EMPTY;
+            dst->piece_on[f8] = r;
+
+            pop_bit(dst->pieces[r], h8);
+            set_bit(dst->pieces[r], f8);
+
+            pop_bit(dst->occupancies[BLACK], h8);
+            set_bit(dst->occupancies[BLACK], f8);
+
+            dst->castling &= ~BLACK_KINGSIDE;
+        } else if(to == c8){
+            dst->piece_on[a8] = EMPTY;
+            dst->piece_on[d8] = r;
+
+            pop_bit(dst->pieces[r], a8);
+            set_bit(dst->pieces[r], d8);
+
+            pop_bit(dst->occupancies[BLACK], a8);
+            set_bit(dst->occupancies[BLACK], d8);
+
+            dst->castling &= ~BLACK_QUEENSIDE;
+        }
     } else if(flag == PROMOTION){
+        dst->piece_on[from] = EMPTY;
+        dst->piece_on[to] = promotion_piece;
 
+        pop_bit(dst->pieces[piece], from);
+        set_bit(dst->pieces[promotion_piece], to);
+
+        pop_bit(dst->occupancies[side], from);
+        set_bit(dst->occupancies[side], to);        
     } else if(flag == PROMO_CAPTURE){
-
+        int captured = src->piece_on[to];
+        
+        dst->piece_on[from] = EMPTY;
+        dst->piece_on[to] = promotion_piece;
+        
+        pop_bit(dst->pieces[piece], from);
+        set_bit(dst->pieces[promotion_piece], to);
+        
+        pop_bit(dst->occupancies[side], from);
+        set_bit(dst->occupancies[side], to);
+        
+        pop_bit(dst->pieces[captured], to);
+        pop_bit(dst->occupancies[!side], to);
     }
-    
-    dst->occupancy[BOTH] = dst->occupancy[WHITE] | dst->occupancy[BLACK];
+    dst->occupancies[BOTH] = dst->occupancies[WHITE] | dst->occupancies[BLACK];
+
+    dst->castling &= castling_rights[from];
+    dst->castling &= castling_rights[to];
 }
 
-void unmake_move(Board *dst, Board *src){
-    memcpy(dst, src, sizeof(Board));
+int is_in_check(Board *dst, int side){
+    U64 king = dst->pieces[K + side * 6];
+    int king_sq = pop_LS1(king);
+
+    if(knight_table[king_sq] & dst->pieces[N + !side * 6]) return 1;
+
+    if(bishop_attacks(dst->occupancies[BOTH], king_sq) & (dst->pieces[B + !side * 6] | dst->pieces[Q + !side * 6])) return 1;
+
+    if(rook_attacks(dst->occupancies[BOTH], king_sq) & (dst->pieces[R + !side * 6] | dst->pieces[Q + !side * 6])) return 1;
+
+    if(pawn_table[side][king_sq] & dst->pieces[P + !side * 6]) return 1;
+
+    if(king_table[king_sq] & dst->pieces[K + !side * 6]) return 1;
+
+    return 0;
 }

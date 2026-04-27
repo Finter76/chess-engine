@@ -41,6 +41,8 @@ enum {
     WHITE, BLACK, BOTH
 };
 
+extern int castling_rights[64];
+
 // Quiet, capture, en passant, castling, promotion
 typedef enum {
     QUIET, CAPTURE, ENPASSANT, CASTLING, PROMOTION, PROMO_CAPTURE

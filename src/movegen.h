@@ -24,4 +24,5 @@ void generate_moves(Board *board, MoveList *list);
 void   make_move(Board *dst, Board *src, Move move);
 void unmake_move(Board *dst, Board *src);
 
+int is_in_check(Board *board, int side);
 #endif
