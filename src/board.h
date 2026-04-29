@@ -105,16 +105,15 @@ void init_board_masks(void);
 #define south_east(board) (((board) & ~FILE_H) >> 7)
 #define south_west(board) (((board) & ~FILE_A) >> 9)
 
-// KNIGHT MOVES
-
-#define nonoeast(board)  (((board) & ~FILE_H) << 17)
-#define nonowest(board)  (((board) & ~FILE_A) << 15)
-#define sosoeast(board)  (((board) & ~FILE_H) >> 17)
-#define sosowest(board)  (((board) & ~FILE_A) >> 15)
-#define eaeanorth(board) (((board) & ~FILE_G & ~FILE_H) << 10)
-#define eaeasouth(board) (((board) & ~FILE_G & ~FILE_H) >> 10)
+// KNIGHT MOVES 
+#define nonoeast(board) (((board) & ~FILE_H) << 17) 
+#define nonowest(board) (((board) & ~FILE_A) << 15) 
+#define sosoeast(board) (((board) & ~FILE_H) >> 15) 
+#define sosowest(board) (((board) & ~FILE_A) >> 17) 
+#define eaeanorth(board) (((board) & ~FILE_G & ~FILE_H) << 10) 
+#define eaeasouth(board) (((board) & ~FILE_G & ~FILE_H) >> 6) 
 #define wewenorth(board) (((board) & ~FILE_A & ~FILE_B) << 6)
-#define wewesouth(board) (((board) & ~FILE_A & ~FILE_B) >> 6)
+#define wewesouth(board) (((board) & ~FILE_A & ~FILE_B) >> 10)
 
 // CASTLING BITMASK 
 
